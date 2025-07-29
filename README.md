@@ -1,7 +1,7 @@
 # **ESP32 Home Assistant Power Monitor**
 
 
-##Overview
+## **Overview**
 
 
 This project fetches real-time power consumption and monthly usage from Home Assistant via its REST API. It calculates electricity cost and displays it on a 16x2 I2C LCD. When power usage drops below a threshold or data stops updating (indicating power outage), it switches to a UPS power warning mode, showing remaining UPS runtime and battery charge with no annoying screen flicker.
