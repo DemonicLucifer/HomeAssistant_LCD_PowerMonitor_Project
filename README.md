@@ -24,7 +24,7 @@ Clean, flicker-free LCD display updates
 ## **Requirements**
 
 
-ESP32 board
+ESP32 board with built in Wifi
 
 16x2 I2C LCD (address 0x27)
 
