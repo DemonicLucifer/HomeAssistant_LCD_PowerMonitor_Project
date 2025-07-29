@@ -1,0 +1,163 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <ArduinoJson.h>
+
+// WiFi credentials - FILL YOURS BEFORE UPLOADING
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+// Home Assistant info - FILL YOURS BEFORE UPLOADING
+const char* host = "YOUR_HA_IP_ADDRESS";
+const int port = 8123;
+const char* token = "YOUR_LONG_LIVED_ACCESS_TOKEN";
+
+// Replace these with your actual sensor entity IDs
+const char* entityPower = "sensor.power_consumption";
+const char* entityMonthlyUsage = "sensor.monthly_energy_usage";
+const char* entityBatteryRuntime = "sensor.ups_battery_runtime";
+const char* entityBatteryCharge = "sensor.ups_battery_charge";
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+float cachedPower = -1;
+float cachedMonthlyUsage = -1;
+float cachedCost = -1;
+float cachedBatteryRuntime = -1;
+float cachedBatteryCharge = -1;
+
+unsigned long lastFetch = 0;
+unsigned long lastDataUpdate = 0;
+const unsigned long fetchInterval = 2000;  // 2 seconds
+const unsigned long staleThreshold = 5000; // 5 seconds stale = UPS mode
+
+const float COST_PER_KWH = 0.0;  // Set your cost per kWh here
+
+bool lastIsUPS = false;  
+float lastPowerValue = -1;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  lcd.init();
+  lcd.backlight();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Connecting WiFi");
+
+  WiFi.begin(ssid, password);
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED && tries < 20) {
+    delay(500);
+    Serial.print(".");
+    tries++;
+  }
+
+  lcd.clear();
+  if (WiFi.status() == WL_CONNECTED) {
+    lcd.setCursor(0, 0);
+    lcd.print("WiFi Connected");
+    delay(1000);
+  } else {
+    lcd.setCursor(0, 0);
+    lcd.print("WiFi Failed");
+    while (true);
+  }
+}
+
+float fetchHAState(const char* entityId) {
+  if (WiFi.status() != WL_CONNECTED) return -1;
+
+  HTTPClient http;
+  String url = String("http://") + host + ":" + port + "/api/states/" + entityId;
+  http.begin(url);
+  http.addHeader("Authorization", String("Bearer ") + token);
+  http.addHeader("Content-Type", "application/json");
+
+  int httpCode = http.GET();
+  if (httpCode == 200) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(2048);
+    DeserializationError error = deserializeJson(doc, payload);
+    if (error) {
+      Serial.print("JSON Error: ");
+      Serial.println(error.c_str());
+      http.end();
+      return -1;
+    }
+
+    const char* stateStr = doc["state"];
+    float state = atof(stateStr);
+    http.end();
+    return state;
+  } else {
+    Serial.println("HTTP Error: " + String(httpCode));
+    http.end();
+    return -1;
+  }
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  if (now - lastFetch >= fetchInterval) {
+    float newPower = fetchHAState(entityPower);
+    if (newPower >= 0) {
+      if (abs(newPower - lastPowerValue) > 0.1) {
+        lastDataUpdate = now;
+        Serial.println("Power changed. Updating lastDataUpdate.");
+      }
+      cachedPower = newPower;
+      lastPowerValue = newPower;
+    }
+
+    cachedMonthlyUsage = fetchHAState(entityMonthlyUsage);
+    if (cachedMonthlyUsage >= 0) cachedCost = cachedMonthlyUsage * COST_PER_KWH;
+    else cachedCost = -1;
+
+    cachedBatteryRuntime = fetchHAState(entityBatteryRuntime);
+    cachedBatteryCharge = fetchHAState(entityBatteryCharge);
+
+    lastFetch = now;
+  }
+
+  unsigned long timeSinceUpdate = now - lastDataUpdate;
+  bool isUPS = (timeSinceUpdate > staleThreshold) || (cachedPower >= 0 && cachedPower < 5.0);
+
+  if (isUPS != lastIsUPS) {
+    lcd.clear();  // ONLY clear when mode changes
+    lastIsUPS = isUPS;
+  }
+
+  if (isUPS) {
+    lcd.setCursor(0, 0);
+    lcd.print("UPS Power      "); // pad spaces to overwrite old chars
+
+    lcd.setCursor(0, 1);
+    if (cachedBatteryRuntime >= 0 && cachedBatteryCharge >= 0) {
+      String line2 = "RT:" + String(int(cachedBatteryRuntime)) + "m B:" + String(int(cachedBatteryCharge)) + "%   ";
+      lcd.print(line2);
+    } else {
+      lcd.print("RT:ERR B:ERR   ");
+    }
+  } else {
+    lcd.setCursor(0, 0);
+    lcd.print("Power: ");
+    if (cachedPower >= 0) {
+      lcd.print(String(cachedPower, 1) + "W   ");
+    } else {
+      lcd.print("ERR       ");
+    }
+
+    lcd.setCursor(0, 1);
+    if (cachedCost >= 0) {
+      String costStr = "Cost: " + String(cachedCost, 2);
+      costStr += "                ";
+      costStr = costStr.substring(0, 16);
+      lcd.print(costStr);
+    } else {
+      lcd.print("Cost: ERR      ");
+    }
+  }
+}
