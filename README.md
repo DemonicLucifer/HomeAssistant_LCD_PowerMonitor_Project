@@ -49,13 +49,15 @@ Upload to your ESP32 and enjoy real-time monitoring.
 
 ## **Notes**
 
-
 The code assumes power consumption data updates regularly - if no update for 5 seconds, it assumes power outage.
 
 The UPS runtime sensor value is expected in seconds and is converted to minutes for display.
 
 No $/£ sign by default, but can be added easily.
 
-License
+## **Support Disclaimer**
+This project was built as a personal home setup, and while you're welcome to use or modify it, please note that I’m not able to offer support or troubleshooting help. If something isn’t working, feel free to fork it and tweak it to suit your needs.
+
+## **License**
 MIT License - Feel free to use, modify, and share.
 
