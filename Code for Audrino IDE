@@ -132,7 +132,7 @@ void loop() {
 
   if (isUPS) {
     lcd.setCursor(0, 0);
-    lcd.print("UPS Power      "); // pad spaces to overwrite old chars
+    lcd.print( **UPS Power**      "); // pad spaces to overwrite old chars
 
     lcd.setCursor(0, 1);
     if (cachedBatteryRuntime >= 0 && cachedBatteryCharge >= 0) {
