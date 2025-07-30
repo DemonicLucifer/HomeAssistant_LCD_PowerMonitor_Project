@@ -1,4 +1,4 @@
-# **A lightweight ESP32 project to monitor power usage,cost, display live data on an I2C LCD, and detect UPS fallback with estimated runtimne and battery pecentage using Home Assistant sensors.**
+# **A lightweight ESP32 project to monitor power usage, cost, display live data on an I2C LCD, and detect UPS fallback with estimated runtime and battery pecentage using Home Assistant sensors.**
 
 
 ## **Overview**
